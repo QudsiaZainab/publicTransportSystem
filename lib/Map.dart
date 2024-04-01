@@ -1,83 +1,9 @@
-// import 'package:flutter/material.dart';
-// import 'package:google_maps_flutter/google_maps_flutter.dart';
-// import 'package:geolocator/geolocator.dart';
-
-// void main() => runApp(const MapApp());
-
-// class MapApp extends StatelessWidget {
-//   const MapApp({Key? key}) : super(key: key);
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return MaterialApp(
-//       home: const Map(),
-//     );
-//   }
-// }
-
-// class Map extends StatefulWidget {
-//   const Map({Key? key}) : super(key: key);
-
-//   @override
-//   State<Map> createState() => _MapState();
-// }
-
-// class _MapState extends State<Map> {
-//   late GoogleMapController mapController;
-
-//   LatLng _center =
-//       const LatLng(33.6844, 73.0479); // Default to Islamabad coordinates
-
-//   void _onMapCreated(GoogleMapController controller) {
-//     mapController = controller;
-//   }
-
-//   Future<void> _getCurrentLocation() async {
-//     Position position = await Geolocator.getCurrentPosition();
-//     setState(() {
-//       _center = LatLng(position.latitude, position.longitude);
-//     });
-//   }
-
-//   @override
-//   void initState() {
-//     super.initState();
-//     _getCurrentLocation();
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       appBar: AppBar(
-//         title: const Text(
-//           'Google Map',
-//           style: TextStyle(color: Colors.white),
-//         ),
-//         backgroundColor: Colors.red,
-//         elevation: 2,
-//         leading: IconButton(
-//           icon: const Icon(Icons.arrow_back, color: Colors.white),
-//           onPressed: () {
-//             Navigator.of(context).pop();
-//           },
-//         ),
-//       ),
-//       body: GoogleMap(
-//         onMapCreated: _onMapCreated,
-//         initialCameraPosition: CameraPosition(
-//           target: _center,
-//           zoom: 12.0,
-//         ),
-//       ),
-//     );
-//   }
-// }
-
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'directions_model.dart';
-
-import 'directions_repository.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class MyApp extends StatelessWidget {
   @override
@@ -88,180 +14,250 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primaryColor: Colors.white,
       ),
-      home: Map(),
+      home: MapSample(),
     );
   }
 }
 
-class Map extends StatefulWidget {
+class MapSample extends StatefulWidget {
   @override
-  _MapState createState() => _MapState();
+  State<MapSample> createState() => MapSampleState();
 }
 
-class _MapState extends State<Map> {
-  static const _initialCameraPosition = CameraPosition(
-    target: LatLng(37.773972, -122.431297),
-    zoom: 11.5,
+class MapSampleState extends State<MapSample> {
+  Completer<GoogleMapController> _controller = Completer();
+  Position? _currentPosition;
+
+  final List<Marker> markers = [];
+
+  static late CameraPosition _kGooglePlex;
+
+  late Polyline _route;
+  late Polyline _route2;
+
+  static const String apiKey = 'AIzaSyAhF_57bZzH95SNl13TPDv9nGlH6WslzIo';
+
+  Future<void> _getCurrentLocation() async {
+    try {
+      _currentPosition = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high);
+      setState(() {});
+    } catch (e) {
+      print(e);
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _getCurrentLocation();
+    _route = Polyline(
+      polylineId: PolylineId('route'),
+      color: Colors.blue,
+      width: 3,
+    );
+    _route2 = Polyline(
+      polylineId: PolylineId('route'),
+      color: Colors.blue,
+      width: 3,
+    );
+  }
+
+  var driverLat = 33.68825337987158;
+  var driverLong = 73.0352085285546;
+
+  dothis() {
+    late BitmapDescriptor pickupMarker;
+    late BitmapDescriptor driverMarker;
+    BitmapDescriptor.fromAssetImage(
+            const ImageConfiguration(), 'assets/driverMarker.png')
+        .then((icon) {
+      driverMarker = icon;
+      markers.add(Marker(
+          markerId: MarkerId("0"),
+          position: LatLng(driverLat, driverLong),
+          icon: driverMarker));
+      driverDemo(icon);
+    });
+    BitmapDescriptor.fromAssetImage(
+            const ImageConfiguration(), 'assets/pickupMarker.png')
+        .then((icon) {
+      pickupMarker = icon;
+      markers.add(Marker(
+          markerId: MarkerId("1"),
+          position: LatLng(33.68825337987158, 73.0352085285546),
+          icon: pickupMarker));
+    });
+  }
+
+  driverDemo(BitmapDescriptor x) async {
+    while (true) {
+      await Future.delayed(Duration(seconds: 1));
+      print("object");
+      driverLat += 0.001;
+      driverLong += 0.001;
+      markers[0] = Marker(
+          markerId: MarkerId("0"),
+          position: LatLng(driverLat, driverLong),
+          icon: x);
+      setState(() {});
+    }
+  }
+
+  Future<void> getDirections() async {
+    final String apiUrl =
+        'https://maps.googleapis.com/maps/api/directions/json?origin=33.68825337987158, 73.0352085285546&destination=33.64105120178869, 72.94838762128458&key=$apiKey';
+
+    final http.Response response = await http.get(Uri.parse(apiUrl));
+
+    if (response.statusCode == 200) {
+      final decodedResponse = json.decode(response.body);
+      List<LatLng> routeCoordinates = _parseRoute(decodedResponse);
+      print(routeCoordinates[1].latitude);
+      List<LatLng> routeCoordinates2 = [
+        LatLng(33.64105120178869, 72.94838762128458),
+        LatLng(33.653559, 73.064585),
+      ];
+      setState(() {
+        _route = Polyline(
+          polylineId: PolylineId('route'),
+          color: Colors.red,
+          width: 5,
+          points: routeCoordinates, // Assign route coordinates to the polyline
+        );
+        _route2 = Polyline(
+          polylineId: PolylineId('route2'),
+          color: Colors.green,
+          width: 5,
+          points: routeCoordinates2, // Assign route coordinates to the polyline
+        );
+      });
+      dothis();
+    } else {
+      throw Exception('Failed to fetch directions');
+    }
+  }
+
+  List<LatLng> _parseRoute(dynamic decodedResponse) {
+    List<LatLng> routeCoordinates = [];
+
+    // Check if 'routes' field is present and not empty
+    if (decodedResponse.containsKey('routes')) {
+      List<dynamic> routes = decodedResponse['routes'];
+
+      if (routes.isNotEmpty) {
+        // Access the first route
+        Map<String, dynamic> firstRoute = routes[0];
+
+        // Check if 'overview_polyline' field is present
+        if (firstRoute.containsKey('overview_polyline')) {
+          Map<String, dynamic> overviewPolyline =
+              firstRoute['overview_polyline'];
+
+          // Check if 'points' field is present and is a string
+          if (overviewPolyline.containsKey('points') &&
+              overviewPolyline['points'] is String) {
+            String points = overviewPolyline['points'];
+
+            // Convert points to LatLng coordinates
+            routeCoordinates = _convertToLatLng(_decodePoly(points));
+          }
+        }
+      }
+    }
+
+    return routeCoordinates;
+  }
+
+  List<LatLng> _convertToLatLng(List points) {
+    List<LatLng> result = <LatLng>[];
+    for (int i = 0; i < points.length; i += 2) {
+      result.add(LatLng(points[i], points[i + 1]));
+    }
+    return result;
+  }
+
+  List _decodePoly(String poly) {
+    var list = poly.codeUnits;
+    var lList = [];
+    int index = 0;
+    int len = poly.length;
+    int c = 0;
+    do {
+      var shift = 0;
+      int result = 0;
+
+      do {
+        c = list[index] - 63;
+        result |= (c & 0x1F) << (shift * 5);
+        index++;
+        shift++;
+      } while (c >= 32);
+      if (result & 1 == 1) {
+        result = ~result;
+      }
+      var result1 = (result >> 1) * 0.00001;
+      lList.add(result1);
+    } while (index < len);
+
+    for (var i = 2; i < lList.length; i++) lList[i] += lList[i - 2];
+
+    return lList;
+  }
+
+  static final CameraPosition _kLake = CameraPosition(
+    bearing: 192.8334,
+    target: LatLng(37.437, -122),
+    tilt: 59.44,
+    zoom: 19.15,
+  );
+
+  static final Marker _kLakeMarker = Marker(
+    markerId: MarkerId('_kLake'),
+    infoWindow: InfoWindow(title: 'K Lake'),
+    icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+    position: LatLng(37.437, -122),
   );
 
   @override
-  void dispose() {
-    _googleMapController.dispose();
-    super.dispose();
-  }
-
-  late GoogleMapController _googleMapController;
-  late Marker _origin;
-  late Marker _destination;
-  late Directions _info;
-
-  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        centerTitle: false,
-        title: const Text('Google Maps'),
-        actions: [
-          if (_origin != null)
-            TextButton(
-              onPressed: () => _googleMapController.animateCamera(
-                CameraUpdate.newCameraPosition(
-                  CameraPosition(
-                    target: _origin.position,
-                    zoom: 14.5,
-                    tilt: 50.0,
-                  ),
-                ),
-              ),
-              style: TextButton.styleFrom(
-                primary: Colors.green,
-                textStyle: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-              child: const Text('ORIGIN'),
-            ),
-          if (_destination != null)
-            TextButton(
-              onPressed: () => _googleMapController.animateCamera(
-                CameraUpdate.newCameraPosition(
-                  CameraPosition(
-                    target: _destination.position,
-                    zoom: 14.5,
-                    tilt: 50.0,
-                  ),
-                ),
-              ),
-              style: TextButton.styleFrom(
-                primary: Colors.blue,
-                textStyle: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-              child: const Text('DEST'),
-            )
-        ],
-      ),
-      body: Stack(
-        alignment: Alignment.center,
-        children: [
-          GoogleMap(
-            myLocationButtonEnabled: false,
-            zoomControlsEnabled: false,
-            initialCameraPosition: _initialCameraPosition,
-            onMapCreated: (controller) => _googleMapController = controller,
-            markers: {
-              if (_origin != null) _origin,
-              if (_destination != null) _destination
-            },
-            polylines: {
-              if (_info != null)
-                Polyline(
-                  polylineId: const PolylineId('overview_polyline'),
-                  color: Colors.red,
-                  width: 5,
-                  points: _info.polylinePoints
-                      .map((e) => LatLng(e.latitude, e.longitude))
-                      .toList(),
-                ),
-            },
-            onLongPress: _addMarker,
-          ),
-          if (_info != null)
-            Positioned(
-              top: 20.0,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 6.0,
-                  horizontal: 12.0,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.yellowAccent,
-                  borderRadius: BorderRadius.circular(20.0),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Colors.black26,
-                      offset: Offset(0, 2),
-                      blurRadius: 6.0,
-                    )
-                  ],
-                ),
-                child: Text(
-                  '${_info.totalDistance}, ${_info.totalDuration}',
-                  style: const TextStyle(
-                    fontSize: 18.0,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: Theme.of(context).primaryColor,
-        foregroundColor: Colors.black,
-        onPressed: () => _googleMapController.animateCamera(
-          _info != null
-              ? CameraUpdate.newLatLngBounds(_info.bounds, 100.0)
-              : CameraUpdate.newCameraPosition(_initialCameraPosition),
+    if (_currentPosition == null) {
+      return Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(), // Show a loading indicator
         ),
-        child: const Icon(Icons.center_focus_strong),
+      );
+    }
+    // if (_currentPosition != null) {
+    _kGooglePlex = CameraPosition(
+      target: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+      zoom: 14.4746,
+    );
+    // }
+    return Scaffold(
+      body: GoogleMap(
+        initialCameraPosition: _kGooglePlex,
+        mapType: MapType.normal,
+        markers: markers.toSet(),
+        polylines: {
+          _route, // Add the _route polyline to the polylines set
+          _route2
+        },
+        onMapCreated: (GoogleMapController controller) {
+          _controller.complete(controller);
+        },
+      ),
+      // floatingActionButton: FloatingActionButton.extended(
+      //   onPressed: getDirections, // Call getDirections when FAB is pressed
+      //   label: Text('Get Directions'),
+      //   icon: Icon(Icons.directions),
+      // ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          getDirections();
+        },
+        child: Icon(Icons.directions),
       ),
     );
-  }
-
-  void _addMarker(LatLng pos) async {
-    if (_origin == null || (_origin != null && _destination != null)) {
-      // Origin is not set OR Origin/Destination are both set
-      // Set origin
-      setState(() {
-        _origin = Marker(
-          markerId: const MarkerId('origin'),
-          infoWindow: const InfoWindow(title: 'Origin'),
-          icon:
-              BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-          position: pos,
-        );
-        // Reset destination
-        _destination = _origin;
-
-        // Reset info
-        // Get directions
-
-        _info = _info;
-      });
-    } else {
-      // Origin is already set
-      // Set destination
-      setState(() {
-        _destination = Marker(
-          markerId: const MarkerId('destination'),
-          infoWindow: const InfoWindow(title: 'Destination'),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
-          position: pos,
-        );
-      });
-
-      // Get directions
-      final directions = await DirectionsRepository()
-          .getDirections(origin: _origin.position, destination: pos);
-      setState(() => _info = directions);
-    }
   }
 }

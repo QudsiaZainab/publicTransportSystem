@@ -267,7 +267,7 @@ class _LocationSelectionPageState extends State<LocationSelectionPage> {
   List<PlacesSearchResult> displayedLocations = [];
   TextEditingController searchController = TextEditingController();
   final places =
-      GoogleMapsPlaces(apiKey: 'AIzaSyA4kFE1fIOPQA8IU2IpKjtPA0asWWa3ms0');
+      GoogleMapsPlaces(apiKey: 'AIzaSyAhF_57bZzH95SNl13TPDv9nGlH6WslzIo');
 
   @override
   void initState() {

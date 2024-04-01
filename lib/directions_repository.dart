@@ -6,13 +6,13 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 class DirectionsRepository {
   static const String _baseUrl =
       'https://maps.googleapis.com/maps/api/directions/json?';
-  String googleAPIKey = "AIzaSyA4kFE1fIOPQA8IU2IpKjtPA0asWWa3ms0";
+  String googleAPIKey = "AIzaSyAhF_57bZzH95SNl13TPDv9nGlH6WslzIo";
 
   final Dio _dio;
 
-  DirectionsRepository({Dio dio}) : _dio = dio ?? Dio();
+  DirectionsRepository({Dio? dio}) : _dio = dio ?? Dio();
 
-  Future<Directions> getDirections({
+  Future<Directions?> getDirections({
     required LatLng origin,
     required LatLng destination,
   }) async {
@@ -25,8 +25,8 @@ class DirectionsRepository {
       },
     );
 
-    // Check if response is successful
-    if (response.statusCode == 200) {
+    // Check if response is not null and successful
+    if (response != null && response.statusCode == 200) {
       return Directions.fromMap(response.data);
     }
     return null;

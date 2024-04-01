@@ -72,7 +72,7 @@ class Navbar extends StatelessWidget {
               // Navigate to a new page here
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (context) => Map(),
+                  builder: (context) => MyApp(),
                 ),
               );
             },

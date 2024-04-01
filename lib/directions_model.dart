@@ -15,9 +15,6 @@ class Directions {
     required this.totalDuration,
   });
 
-  // factory Directions.fromMap(Map<String, dynamic> map) {
-  // Check if route is not available
-  // if ((map['routes'] as List).isEmpty) {return null};
   static Directions? fromMap(Map<String, dynamic> map) {
     // Check if the route is not available
     if ((map['routes'] as List).isEmpty) return null;
