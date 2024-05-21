@@ -161,64 +161,6 @@ class DriverHome extends StatelessWidget {
                     // Navigate to a new page here
                     Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (context) => DriverRoutes(),
-                      ),
-                    );
-                  },
-                  child: Container(
-                    margin: EdgeInsets.only(top: 20),
-                    width: 110,
-                    height: 110,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.5),
-                          spreadRadius: 5,
-                          blurRadius: 7,
-                          offset: Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 90,
-                          height: 70,
-                          padding: EdgeInsets.only(
-                            left: 10.0,
-                            right: 10.0,
-                            top: 10.0,
-                            bottom: 5,
-                          ),
-                          child: Image.asset('assets/images/routes.jpeg'),
-                        ),
-                        SizedBox(height: 5),
-                        Text(
-                          'Driver Routes',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                          ),
-                        ),
-                        SizedBox(height: 5),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                GestureDetector(
-                  onTap: () {
-                    // Navigate to a new page here
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
                         builder: (context) => Stops(),
                       ),
                     );
@@ -267,6 +209,12 @@ class DriverHome extends StatelessWidget {
                     ),
                   ),
                 ),
+              ],
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+
                 GestureDetector(
                   onTap: () {
                     // Navigate to a new page here
@@ -278,7 +226,7 @@ class DriverHome extends StatelessWidget {
                   },
                   child: Container(
                     margin: EdgeInsets.only(top: 20),
-                    width: 110,
+                    width: 130,
                     height: 110,
                     decoration: BoxDecoration(
                       color: Colors.white,
@@ -331,7 +279,7 @@ class DriverHome extends StatelessWidget {
                   },
                   child: Container(
                     margin: EdgeInsets.only(top: 20),
-                    width: 110,
+                    width: 130,
                     height: 110,
                     decoration: BoxDecoration(
                       color: Colors.white,

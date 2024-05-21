@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_maps_webservice/places.dart';
 import 'plannedJourney.dart';
+import 'dart:async';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'dart:math';
 
 class JourneyPlanner extends StatefulWidget {
   @override
@@ -9,22 +13,227 @@ class JourneyPlanner extends StatefulWidget {
 }
 
 class _JourneyPlannerState extends State<JourneyPlanner> {
-  String fromLocation = '';
-  String toLocation = '';
+  LatLng fromLocation = LatLng(0, 0);
+  LatLng toLocation = LatLng(0, 0);
+
+  String fromLocationName = '';
+  String toLocationName = '';
   String selectedTransport = 'Bus';
   bool isBusSelected = false;
   bool isVanSelected = false;
-  bool isButtonEnabled = false; // Track whether the button should be enabled
+  bool isButtonEnabled = false;
+  String driverArrivalTime = '';
+
+  var driverLat = 33.68825337987158;
+  var driverLong = 73.0352085285546;
+
+  var driverLat2 = 33.65751080545608;
+  var driverLong2 = 73.04772569681272;
+
+  static const String apiKey = 'AIzaSyAhF_57bZzH95SNl13TPDv9nGlH6WslzIo';
+  final String apiUrl =
+      'https://maps.googleapis.com/maps/api/directions/json?origin=33.68825337987158, 73.0352085285546&destination=33.64105120178869, 72.94838762128458&waypoints=via:33.678767367050085, 73.01426940636904|via:33.707517712095985, 73.03583127449788|via:33.67002876588016, 72.99619261877697|via:33.655945929558776, 72.98000094042074|via:33.65209318721671, 72.96722665093546&key=$apiKey';
+  final String apiUrl2 =
+      'https://maps.googleapis.com/maps/api/directions/json?origin=33.69541941928578, 73.01099917620775&destination=33.70790, 73.05048&waypoints=via:33.70929966697905, 73.03964128326247|via:33.73035633310524, 73.03722055634482|via:33.66613661613609, 73.07109517220269|via:33.655945929558776, 72.98000094042074|via:33.65722503502194, 73.05648042690798&key=$apiKey';
+
+  List<dynamic> routes = [];
+  List<Map<String, dynamic>> driverLocations = [
+    {
+      'lat': 33.68825337987158,
+      'long': 73.0352085285546,
+      'vehicle': '106',
+      'route':
+          'https://maps.googleapis.com/maps/api/directions/json?origin=33.68825337987158, 73.0352085285546&destination=33.64105120178869, 72.94838762128458&waypoints=via:33.678767367050085, 73.01426940636904|via:33.707517712095985, 73.03583127449788|via:33.67002876588016, 72.99619261877697|via:33.655945929558776, 72.98000094042074|via:33.65209318721671, 72.96722665093546&key=$apiKey'
+    },
+    {
+      'lat': 33.65751080545608,
+      'long': 73.04772569681272,
+      'vehicle': '109',
+      'route':
+          'https://maps.googleapis.com/maps/api/directions/json?origin=33.69541941928578, 73.01099917620775&destination=33.70790, 73.05048&waypoints=via:33.70929966697905, 73.03964128326247|via:33.73035633310524, 73.03722055634482|via:33.66613661613609, 73.07109517220269|via:33.655945929558776, 72.98000094042074|via:33.65722503502194, 73.05648042690798&key=$apiKey'
+    },
+  ];
 
   // Function to check if both "From" and "To" fields are filled
   bool isBothFieldsFilled() {
-    return fromLocation.isNotEmpty && toLocation.isNotEmpty;
+    return fromLocation.latitude != 0 &&
+        fromLocation.longitude != 0 &&
+        toLocation.latitude != 0 &&
+        toLocation.longitude != 0;
   }
 
   // Update the button's enabled state
   void updateButtonState() {
     setState(() {
       isButtonEnabled = isBothFieldsFilled();
+    });
+  }
+
+  Future<void> getDirections(
+      LatLng fromLocationLatLng, LatLng toLocationLatLng) async {
+    bool routeFound = false;
+    final now = DateTime.now();
+
+    for (final driverLocation in driverLocations) {
+      final vh = driverLocation['vehicle'];
+      final apiUrl = driverLocation['route'];
+
+      if (apiUrl != null) {
+        final response = await http.get(Uri.parse(apiUrl));
+
+        if (response.statusCode == 200) {
+          final Map<String, dynamic> data = json.decode(response.body);
+
+          if (data['status'] == 'OK') {
+            final routes = data['routes'];
+
+            for (final route in routes) {
+              if (willPassThroughLocation(
+                      LatLng(driverLocation['lat'], driverLocation['long']),
+                      fromLocationLatLng,
+                      route) &&
+                  willPassThroughLocation(
+                      LatLng(driverLocation['lat'], driverLocation['long']),
+                      toLocationLatLng,
+                      route)) {
+                final durationInSeconds = calculateTimeToDestination(
+                    LatLng(driverLocation['lat'], driverLocation['long']),
+                    toLocationLatLng,
+                    route);
+
+                final estimatedArrivalTime =
+                    now.add(Duration(seconds: durationInSeconds));
+                setState(() {
+                  driverArrivalTime =
+                      'Vehicle $vh will arrive at $fromLocationName at ${estimatedArrivalTime.hour}:${estimatedArrivalTime.minute}';
+                });
+                routeFound = true;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      if (routeFound) {
+        break; // Exit the loop if a route is found
+      }
+    }
+
+    if (!routeFound) {
+      setState(() {
+        driverArrivalTime = 'No vehicle';
+      });
+    }
+  }
+
+  int calculateTimeToDestination(
+      LatLng driverLocation, LatLng destination, dynamic route) {
+    // Get the duration in seconds from the route object
+    final durationInSeconds = route['legs'][0]['duration']['value'];
+
+    // Calculate the distance between the driver's location and the destination
+    final distance = calculateDistance(driverLocation, destination);
+
+    // Assuming a constant speed of, for example, 50 km/h
+    // You need to replace this with your actual logic based on the real-time traffic conditions and the driver's speed
+    final averageSpeed = 50; // in km/h
+    final timeToDestinationInSeconds =
+        (distance / averageSpeed) * 3600; // Convert hours to seconds
+
+    return timeToDestinationInSeconds.round();
+  }
+
+  bool willPassThroughLocation(
+      LatLng driverLocation, LatLng targetLocation, dynamic route) {
+    // Extract the list of steps from the route object
+    final steps = route['legs'][0]['steps'];
+
+    // Check each step to see if it passes through the 'targetLocation'
+    for (final step in steps) {
+      final polyline = step['polyline']['points'];
+      final decodedPolyline = decodePolyline(polyline);
+
+      // Check each point of the polyline to see if it's close to the target location
+      for (final point in decodedPolyline) {
+        final stepLocation = LatLng(point.latitude, point.longitude);
+        final distance = calculateDistance(stepLocation, targetLocation);
+
+        // Assuming a threshold distance of 100 meters to consider as passing through the target location
+        if (distance < 0.5) {
+          // Adjust this threshold distance based on your requirements
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+// Helper function to decode Google Maps Polyline
+  List<LatLng> decodePolyline(String encoded) {
+    List<LatLng> points = [];
+    int index = 0, len = encoded.length;
+    int lat = 0, lng = 0;
+
+    while (index < len) {
+      int b, shift = 0, result = 0;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      lat += dlat;
+
+      shift = 0;
+      result = 0;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      lng += dlng;
+
+      points.add(LatLng(lat / 1E5, lng / 1E5));
+    }
+
+    return points;
+  }
+
+// Helper function to calculate distance between two LatLng points
+  double calculateDistance(LatLng point1, LatLng point2) {
+    const int radiusOfEarth = 6371; // Earth's radius in kilometers
+    double lat1 = point1.latitude;
+    double lon1 = point1.longitude;
+    double lat2 = point2.latitude;
+    double lon2 = point2.longitude;
+
+    double dLat = _toRadians(lat2 - lat1);
+    double dLon = _toRadians(lon2 - lon1);
+    double a = pow(sin(dLat / 2), 2) +
+        cos(_toRadians(lat1)) * cos(_toRadians(lat2)) * pow(sin(dLon / 2), 2);
+    double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    double distance = radiusOfEarth * c;
+    return distance;
+  }
+
+// Helper function to convert degrees to radians
+  double _toRadians(double degree) {
+    return degree * pi / 180;
+  }
+
+  void updateLocation(String name, LatLng coordinates, bool isFromLocation) {
+    setState(() {
+      if (isFromLocation) {
+        fromLocation = coordinates;
+        fromLocationName = name;
+      } else {
+        toLocation = coordinates;
+        toLocationName = name;
+      }
+      updateButtonState(); // Update button state when location changes
     });
   }
 
@@ -45,21 +254,16 @@ class _JourneyPlannerState extends State<JourneyPlanner> {
                   context,
                   MaterialPageRoute(
                     builder: (context) => LocationSelectionPage(
-                      onLocationSelected: (location) {
-                        setState(() {
-                          fromLocation = location;
-                          updateButtonState(); // Update button state when "From" changes
-                        });
+                      onLocationSelected: (name, location) {
+                        updateLocation(name, location, true);
                       },
                     ),
                   ),
                 );
 
                 if (selectedLocation != null) {
-                  setState(() {
-                    fromLocation = selectedLocation;
-                    updateButtonState(); // Update button state when "From" changes
-                  });
+                  updateLocation(
+                      selectedLocation.name, selectedLocation.location, true);
                 }
               },
               child: Row(
@@ -84,7 +288,7 @@ class _JourneyPlannerState extends State<JourneyPlanner> {
                         ),
                       ),
                       child: Text(
-                        fromLocation.isEmpty ? '' : fromLocation,
+                        fromLocationName.isNotEmpty ? fromLocationName : '',
                         style: TextStyle(fontSize: 18.0),
                       ),
                     ),
@@ -107,21 +311,16 @@ class _JourneyPlannerState extends State<JourneyPlanner> {
                   context,
                   MaterialPageRoute(
                     builder: (context) => LocationSelectionPage(
-                      onLocationSelected: (location) {
-                        setState(() {
-                          toLocation = location;
-                          updateButtonState(); // Update button state when "To" changes
-                        });
+                      onLocationSelected: (name, location) {
+                        updateLocation(name, location, false);
                       },
                     ),
                   ),
                 );
 
                 if (selectedLocation != null) {
-                  setState(() {
-                    toLocation = selectedLocation;
-                    updateButtonState(); // Update button state when "To" changes
-                  });
+                  updateLocation(
+                      selectedLocation.name, selectedLocation.location, false);
                 }
               },
               child: Row(
@@ -146,7 +345,7 @@ class _JourneyPlannerState extends State<JourneyPlanner> {
                         ),
                       ),
                       child: Text(
-                        toLocation.isEmpty ? '' : toLocation,
+                        toLocationName.isNotEmpty ? toLocationName : '',
                         style: TextStyle(fontSize: 18.0),
                       ),
                     ),
@@ -191,17 +390,33 @@ class _JourneyPlannerState extends State<JourneyPlanner> {
             SizedBox(height: 10),
             ElevatedButton(
               onPressed: isButtonEnabled
-                  ? () {
+                  ? () async {
+                      await getDirections(fromLocation, toLocation);
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => PlannedJourney(),
+                          builder: (context) => PlannedJourney(
+                            vehicleName: driverArrivalTime.contains('Vehicle')
+                                ? driverArrivalTime.split(' ')[1]
+                                : '',
+                            timing: driverArrivalTime.contains('at')
+                                ? driverArrivalTime.split(' ')[7]
+                                : '',
+                            fL: fromLocationName,
+                            tL: toLocationName,
+                          ),
                         ),
                       );
                     }
                   : null, // Disable the button if fields are not filled
               child: Text('Plan my journey'),
             ),
+            SizedBox(height: 20),
+            if (driverArrivalTime.isNotEmpty)
+              Text(
+                driverArrivalTime,
+                style: TextStyle(fontSize: 16),
+              ),
           ],
         ),
       ),
@@ -255,7 +470,7 @@ class _JourneyPlannerState extends State<JourneyPlanner> {
 }
 
 class LocationSelectionPage extends StatefulWidget {
-  final Function(String) onLocationSelected;
+  final Function(String, LatLng) onLocationSelected;
 
   LocationSelectionPage({required this.onLocationSelected});
 
@@ -302,6 +517,7 @@ class _LocationSelectionPageState extends State<LocationSelectionPage> {
         ),
         title: TextField(
           controller: searchController,
+          cursorColor: Colors.green,
           style: TextStyle(color: Colors.white), // Set text color to white
           decoration: InputDecoration(
             hintText: 'Search Location',
@@ -317,9 +533,16 @@ class _LocationSelectionPageState extends State<LocationSelectionPage> {
           final location = displayedLocations[index];
           return ListTile(
             title: Text(location.name ?? ''),
-            onTap: () {
-              widget.onLocationSelected(location.name ?? '');
-              Navigator.pop(context, location.name ?? '');
+            onTap: () async {
+              final details =
+                  await places.getDetailsByPlaceId(location.placeId ?? '');
+              final lat = details.result.geometry?.location.lat;
+              final lng = details.result.geometry?.location.lng;
+              if (lat != null && lng != null) {
+                widget.onLocationSelected(
+                    location.name ?? '', LatLng(lat, lng));
+                Navigator.pop(context);
+              }
             },
           );
         },

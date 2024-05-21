@@ -13,11 +13,14 @@ class _VehiclesState extends State<Vehicles> {
   TextEditingController _busNameController = TextEditingController();
   TextEditingController _numberPlateController = TextEditingController();
   List<Map<String, String>> vansData = [];
+  List<String> routeNames = [];
+  String? _selectedRoute;
 
   @override
   void initState() {
     super.initState();
     _loadVanAndRouteData();
+    _loadRoutes();
     _startLocationTracking();
   }
 
@@ -26,17 +29,36 @@ class _VehiclesState extends State<Vehicles> {
     String loggedInContactNo = prefs.getString('loggedInContactNo') ?? '';
 
     if (loggedInContactNo.isNotEmpty) {
-      String vanName =
-          await MongoDatabase.getVehicleNameForPhoneNumber(loggedInContactNo);
-      String routeName =
-          await MongoDatabase.getRouteNameForPhoneNumber(loggedInContactNo);
+      List<String> vanNames =
+          await MongoDatabase.getVanNamesForPhoneNumber(loggedInContactNo);
+      List<String> routeNames =
+          await MongoDatabase.getRouteNamesForPhoneNumber(loggedInContactNo);
+
+      List<Map<String, String>> vanRoutePairs = [];
+
+      // Ensure the length of vanNames and routeNames are the same
+      if (vanNames.length == routeNames.length) {
+        for (int i = 0; i < vanNames.length; i++) {
+          vanRoutePairs
+              .add({"vanName": vanNames[i], "routeName": routeNames[i]});
+        }
+      }
 
       setState(() {
-        vansData = [
-          {"vanName": vanName, "routeName": routeName},
-        ];
+        vansData = vanRoutePairs;
       });
     }
+  }
+
+  Future<void> _loadRoutes() async {
+    List<Map<String, dynamic>> fetchedRoutes = await MongoDatabase.getRoutes();
+    Set<String> uniqueRouteNames = fetchedRoutes
+        .map((route) => route['route_name'].toString())
+        .toSet(); // Convert to a Set to remove duplicates
+
+    setState(() {
+      this.routeNames = uniqueRouteNames.toList(); // Convert back to List
+    });
   }
 
   @override
@@ -70,12 +92,33 @@ class _VehiclesState extends State<Vehicles> {
               ],
             ),
             SizedBox(height: 30),
-            for (var vanData in vansData)
-              _buildVanRow(
-                  vanData['vanName'] ?? '', vanData['routeName'] ?? ''),
+            Expanded(
+              // Use Expanded to allow the list to take remaining space and be scrollable
+              child: SingleChildScrollView(
+                child: Column(
+                  children: vansData
+                      .map((vanData) => _buildVanRow(
+                          vanData['vanName'] ?? '', vanData['routeName'] ?? ''))
+                      .toList(),
+                ),
+              ),
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildVanRows(String vanName, String routeName) {
+    List<Widget> vanRows = [];
+
+    // Create multiple van rows if there are multiple vans associated with a driver
+    for (var i = 0; i < vansData.length; i++) {
+      vanRows.add(_buildVanRow(vanName, routeName));
+    }
+
+    return Column(
+      children: vanRows,
     );
   }
 
@@ -83,7 +126,7 @@ class _VehiclesState extends State<Vehicles> {
     return Container(
       margin: EdgeInsets.fromLTRB(3.0, 10.0, 3.0, 10.0),
       decoration: BoxDecoration(
-        color: Colors.white, // Set the background color to white
+        color: Colors.white,
         borderRadius: BorderRadius.circular(10.0),
         boxShadow: [
           BoxShadow(
@@ -106,16 +149,25 @@ class _VehiclesState extends State<Vehicles> {
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
+                overflow:
+                    TextOverflow.ellipsis, // Handle overflow with ellipsis
               ),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Text(
-                'Route: $routeName',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.normal,
-                  color: Colors.grey,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+              child: Container(
+                width: MediaQuery.of(context).size.width -
+                    70, // Adjust width as needed
+                child: Text(
+                  'Route: $routeName',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.normal,
+                    color: Colors.grey,
+                  ),
+                  softWrap:
+                      true, // Wrap text onto the next line if it overflows
                 ),
               ),
             ),
@@ -136,18 +188,57 @@ class _VehiclesState extends State<Vehicles> {
       builder: (context) {
         return AlertDialog(
           title: Text('Add Vehicle'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: _numberPlateController,
-                decoration: InputDecoration(labelText: 'Route Name'),
+          content: ConstrainedBox(
+            constraints:
+                BoxConstraints(maxWidth: 500), // Adjust maxWidth as needed
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  StatefulBuilder(
+                    builder: (BuildContext context, StateSetter setState) {
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 250, // Adjust width as needed
+                            child: DropdownButtonFormField<String>(
+                              value: _selectedRoute,
+                              items: routeNames.map((String route) {
+                                return DropdownMenuItem<String>(
+                                  value: route,
+                                  child: Container(
+                                    width: 200, // Adjust width as needed
+                                    child: Text(
+                                      route,
+                                      overflow: TextOverflow
+                                          .ellipsis, // Handle overflow if text is too long
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (newValue) {
+                                setState(() {
+                                  _selectedRoute = newValue;
+                                });
+                              },
+                              decoration:
+                                  InputDecoration(labelText: 'Select Route'),
+                            ),
+                          ),
+                          SizedBox(height: 16),
+                          TextFormField(
+                            controller: _busNameController,
+                            decoration:
+                                InputDecoration(labelText: 'Number Plate'),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ],
               ),
-              TextFormField(
-                controller: _busNameController,
-                decoration: InputDecoration(labelText: 'Numberplate No'),
-              ),
-            ],
+            ),
           ),
           actions: [
             TextButton(
@@ -173,6 +264,7 @@ class _VehiclesState extends State<Vehicles> {
                   driverContactNo,
                   position.latitude,
                   position.longitude,
+                  _selectedRoute!, // Pass the selected route
                 );
 
                 Navigator.of(context).pop();
@@ -186,17 +278,14 @@ class _VehiclesState extends State<Vehicles> {
   }
 
   void _startLocationTracking() {
-    // Use a timer to periodically fetch the location
     Timer.periodic(Duration(seconds: 60), (Timer timer) async {
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
 
-      // Retrieve the driver's contact number from SharedPreferences
       SharedPreferences prefs = await SharedPreferences.getInstance();
       String driverContactNo = prefs.getString('loggedInContactNo') ?? '';
 
-      // Update the vehicle information in MongoDB with the new location
       await MongoDatabase.updateDriverLocation(
         driverContactNo,
         position.latitude,
@@ -204,10 +293,4 @@ class _VehiclesState extends State<Vehicles> {
       );
     });
   }
-
-  // void main() {
-  //   runApp(MaterialApp(
-  //     home: Vehicles(),
-  //   ));
-  // }
 }

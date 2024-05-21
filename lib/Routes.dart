@@ -19,18 +19,6 @@ class PlaceIdToLocationNameConverter {
   }
 }
 
-// class Routes extends StatelessWidget {
-//   @override
-//   Widget build(BuildContext context) {
-//     return MaterialApp(
-//       home: MyHomePage(),
-//       theme: ThemeData(
-//         primarySwatch: Colors.red,
-//       ),
-//     );
-//   }
-// }
-
 class Routes extends StatefulWidget {
   @override
   _RoutesState createState() => _RoutesState();
@@ -92,7 +80,7 @@ class _RoutesState extends State<Routes> {
     return formatTime(travelTimeSeconds);
   }
 
-// Haversine formula to calculate distance between two points on Earth
+  // Haversine formula to calculate distance between two points on Earth
   double calculateHaversine(
       double startLat, double startLng, double endLat, double endLng) {
     const int earthRadius = 6371000; // Earth radius in meters
@@ -111,12 +99,12 @@ class _RoutesState extends State<Routes> {
     return earthRadius * c;
   }
 
-// Convert degrees to radians
+  // Convert degrees to radians
   double radians(double degrees) {
     return degrees * (pi / 180);
   }
 
-// Format time in seconds to a human-readable string (HH:MM:SS)
+  // Format time in seconds to a human-readable string (HH:MM:SS)
   String formatTime(double seconds) {
     int hours = (seconds / 3600).floor();
     int minutes = ((seconds % 3600) / 60).floor();
@@ -192,25 +180,36 @@ class _RoutesState extends State<Routes> {
 
       // Extract 'stop_name' values for each route and update the 'stops' map
       for (var route in routes) {
-        stops[route] =
-            data.where((entry) => entry['route_name'] == route).map((entry) {
-          return entry['stop'].toString();
-        }).toList();
+        stops[route] = data
+            .where((entry) => entry['route_name'] == route)
+            .map((entry) {
+              return entry['stop']?.toString() ?? ''; // Ensure non-null stops
+            })
+            .where((stop) => stop.isNotEmpty)
+            .toList(); // Filter out empty stops
       }
 
       for (var route in routes) {
-        drivers[route] =
-            data.where((entry) => entry['route_name'] == route).map((entry) {
-          return entry['driver'].toString();
-        }).toList();
+        drivers[route] = data
+            .where((entry) => entry['route_name'] == route)
+            .map((entry) {
+              return entry['driver']?.toString() ??
+                  ''; // Ensure non-null drivers
+            })
+            .where((driver) => driver.isNotEmpty)
+            .toList(); // Filter out empty drivers
       }
 
       // Extract 'vehicle_name' values for each route and update the 'vehicles' map
       for (var route in routes) {
-        vehicles[route] =
-            data.where((entry) => entry['route_name'] == route).map((entry) {
-          return entry['vehicleNo'].toString();
-        }).toList();
+        vehicles[route] = data
+            .where((entry) => entry['route_name'] == route)
+            .map((entry) {
+              return entry['vehicleNo']?.toString() ??
+                  ''; // Ensure non-null vehicles
+            })
+            .where((vehicle) => vehicle.isNotEmpty)
+            .toList(); // Filter out empty vehicles
       }
     } catch (e) {
       // Handle any errors that might occur during data fetching
@@ -258,10 +257,11 @@ class _RoutesState extends State<Routes> {
                                                       0.0), // Adjust the left padding as needed
                                               child: ListTile(
                                                 title: Text(
-                                                    'Vehicle Name: $vehicle',
-                                                    style: TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.bold)),
+                                                  'Vehicle Name: $vehicle',
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
                                                 onTap: () {
                                                   // Handle vehicle tap
                                                   // Fetch and calculate arrival time

@@ -374,7 +374,7 @@ class _SettingsState extends State<Settings> {
                     Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        'Cloud Services',
+                        'Account',
                         style: TextStyle(
                           fontSize: 18.0,
                           color: Colors.black,

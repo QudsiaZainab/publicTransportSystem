@@ -112,7 +112,7 @@ class MongoDatabase {
 
       // Search for a document with the provided phone number
       final count = await db
-          .collection('drivers')
+          .collection('public_users')
           .count(where.eq('phone_no', phoneNumber));
 
       await db.close();
@@ -170,76 +170,104 @@ class MongoDatabase {
     }
   }
 
-  static Future<String> getVanNameForPhoneNumber(String phoneNumber) async {
+  static Future<List<Map<String, dynamic>>> getRoutes() async {
     try {
       final db = await Db.create(MONGO_URL);
       await db.open();
 
-      final driverCollection = db.collection('drivers');
+      // Replace 'routes' with the actual name of your collection
+      final collection = db.collection('routes');
 
-      // Search for a document with the provided phone number
-      final driverDocument =
-          await driverCollection.findOne(where.eq('phone_no', phoneNumber));
-
-      if (driverDocument != null) {
-        // Driver found, get driver ID
-        final driverId = driverDocument['phone_no'];
-
-        // Fetch van name based on driver ID from the associated collection
-        final vanRouteCollection = db.collection('routes');
-        final vanDocument =
-            await vanRouteCollection.findOne(where.eq('driver', driverId));
-        // print(vanDocument);
-
-        if (vanDocument != null) {
-          return vanDocument['vehicleNo'] as String;
-        }
-      }
+      // Fetch all documents in the collection
+      final List<Map<String, dynamic>> data = await collection.find().toList();
 
       await db.close();
-      return ''; // Return empty string if not found
+      print(data);
+      return data;
     } catch (e) {
-      print('Error getting van name for phone number: $e');
-      return ''; // Handle the error as needed
+      print('Error fetching data: $e');
+      return []; // Handle the error as needed
     }
   }
 
-  static Future<String> getRouteNameForPhoneNumber(String phoneNumber) async {
+  static Future<List<String>> getVanNamesForPhoneNumber(
+      String phoneNumber) async {
     try {
       final db = await Db.create(MONGO_URL);
       await db.open();
 
       final driverCollection = db.collection('drivers');
 
-      // Search for a document with the provided phone number
-      final driverDocument =
-          await driverCollection.findOne(where.eq('phone_no', phoneNumber));
-      // print(driverDocument);
+      // Search for documents with the provided phone number
+      final driverDocuments = await driverCollection
+          .find(where.eq('phone_no', phoneNumber))
+          .toList();
 
-      if (driverDocument != null) {
-        // Driver found, get driver ID
+      final List<String> routeNames = [];
+
+      for (final driverDocument in driverDocuments) {
         final driverId = driverDocument['phone_no'];
 
-        // Fetch route name based on driver ID from the associated collection
-        final vanRouteCollection = db.collection('routes');
-        final routeDocument =
-            await vanRouteCollection.findOne(where.eq('driver', driverId));
+        // Fetch route names based on driver ID from the associated collection
+        final vanRouteCollection = db.collection('vehicles');
+        final routeDocuments = await vanRouteCollection
+            .find(where.eq('driver_contact_no', driverId))
+            .toList();
 
-        if (routeDocument != null) {
-          return routeDocument['route_name'] as String;
+        for (final routeDocument in routeDocuments) {
+          routeNames.add(routeDocument['vehicle_name'] as String);
         }
       }
 
       await db.close();
-      return ''; // Return empty string if not found
+      print(routeNames);
+      return routeNames;
     } catch (e) {
-      print('Error getting route name for phone number: $e');
-      return ''; // Handle the error as needed
+      print('Error getting route names for phone number: $e');
+      return []; // Handle the error as needed
+    }
+  }
+
+  static Future<List<String>> getRouteNamesForPhoneNumber(
+      String phoneNumber) async {
+    try {
+      final db = await Db.create(MONGO_URL);
+      await db.open();
+
+      final driverCollection = db.collection('drivers');
+
+      // Search for documents with the provided phone number
+      final driverDocuments = await driverCollection
+          .find(where.eq('phone_no', phoneNumber))
+          .toList();
+
+      final List<String> routeNames = [];
+
+      for (final driverDocument in driverDocuments) {
+        final driverId = driverDocument['phone_no'];
+
+        // Fetch route names based on driver ID from the associated collection
+        final vanRouteCollection = db.collection('routes');
+        final routeDocuments = await vanRouteCollection
+            .find(where.eq('driver', driverId))
+            .toList();
+
+        for (final routeDocument in routeDocuments) {
+          routeNames.add(routeDocument['route_name'] as String);
+        }
+      }
+
+      await db.close();
+      print(routeNames);
+      return routeNames;
+    } catch (e) {
+      print('Error getting route names for phone number: $e');
+      return []; // Handle the error as needed
     }
   }
 
   static Future<void> addVehicle(String vehicleName, String driverContactNo,
-      double latitude, double longitude) async {
+      double latitude, double longitude, String selectedRoute) async {
     try {
       final db = await Db.create(MONGO_URL);
       await db.open();
@@ -257,6 +285,22 @@ class MongoDatabase {
       });
 
       await db.close();
+
+      final d = await Db.create(MONGO_URL);
+      await d.open();
+
+      final routesCollection = d.collection('routes');
+
+      // Insert vehicle information into the collection
+      await routesCollection.insertOne({
+        'vehicleNo': vehicleName,
+        'driver': driverContactNo,
+        'route_name': selectedRoute,
+        'latitude': latitude,
+        'longitude': longitude
+      });
+
+      await d.close();
     } catch (e) {
       print('Error adding vehicle: $e');
       // Handle the error as needed
@@ -411,8 +455,7 @@ class MongoDatabase {
     }
   }
 
-  static Future<void> addNewStop(
-      String stopName, double latitude, double longitude) async {
+  static Future<void> addNewStop(String stopName, String contactNo) async {
     try {
       final db = await Db.create(MONGO_URL);
       await db.open();
@@ -423,11 +466,11 @@ class MongoDatabase {
       // Insert the new stop information into the collection
       await collection.insert({
         'stop_name': stopName,
-        'latitude': latitude,
-        'longitude': longitude,
+        'driver': contactNo,
       });
 
       await db.close();
+      print(collection);
     } catch (e) {
       print('Error adding new stop: $e');
       // Handle the error as needed
@@ -475,6 +518,64 @@ class MongoDatabase {
       return issuesCursor;
     } catch (e) {
       print('Error getting issues for vehicle: $e');
+      return []; // Handle the error as needed
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> getStopsForContact(
+      String contactNumber) async {
+    try {
+      final db = await Db.create(MONGO_URL);
+      await db.open();
+
+      final stopsCollection = db.collection('stops');
+
+      final stopDocuments = await stopsCollection
+          .find(where.eq('driver', contactNumber))
+          .toList();
+
+      final List<Map<String, dynamic>> stopsList = [];
+
+      for (final stopDocument in stopDocuments) {
+        stopsList.add({
+          'stop_name': stopDocument['stop_name'],
+          'latitude': stopDocument['latitude'],
+          'longitude': stopDocument['longitude'],
+        });
+      }
+
+      await db.close();
+      print(stopsList);
+      return stopsList;
+    } catch (e) {
+      print('Error getting stops for contact: $e');
+      return [];
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> getStopsDataForRoute(
+      String routeName) async {
+    try {
+      final db = await Db.create(MONGO_URL);
+      await db.open();
+
+      final collection = db.collection('routes');
+
+      // Find the route document by route name
+      final routeDocument =
+          await collection.findOne(where.eq('route_name', routeName));
+
+      await db.close();
+
+      // If the route document is found and contains stops, return them
+      if (routeDocument != null && routeDocument.containsKey('stop')) {
+        print(List<Map<String, dynamic>>.from(routeDocument['stop']));
+        return List<Map<String, dynamic>>.from(routeDocument['stop']);
+      } else {
+        return []; // Return empty list if route or stops are not found
+      }
+    } catch (e) {
+      print('Error getting stops for route: $e');
       return []; // Handle the error as needed
     }
   }

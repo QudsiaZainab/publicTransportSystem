@@ -93,12 +93,12 @@ class _NearbyState extends State<Nearby> {
     }
   }
 
-
   // Function to calculate the distance between two sets of coordinates
   double calculateDistance(String stopLat, String stopLon) {
     // Replace these values with the actual current location coordinates
-    double currentLat = double.parse(_latitude) ; // Replace with actual latitude
-    double currentLong = double.parse(_longitude) ; // Replace with actual longitude
+    double currentLat = double.parse(_latitude); // Replace with actual latitude
+    double currentLong =
+        double.parse(_longitude); // Replace with actual longitude
 
     // Use Geolocator's distanceBetween function to calculate distance in meters
     return Geolocator.distanceBetween(
@@ -119,7 +119,6 @@ class _NearbyState extends State<Nearby> {
         mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-
           Expanded(
             child: ListView.builder(
               itemCount: stops.length,
@@ -127,14 +126,28 @@ class _NearbyState extends State<Nearby> {
                 // Access the stop data and calculate the distance
                 final stop = stops[index];
                 final stopName = stop;
-                final stopLat = lat[stop]!.first; // Assuming there's at least one latitude
-                final stopLon = long[stop]!.first; // Assuming there's at least one longitude
-                final distance = calculateDistance(stopLat, stopLon);
+                final stopLatList = lat[stop];
+                final stopLonList = long[stop];
 
-                return ListTile(
-                  title: Text(stopName),
-                  subtitle: Text('Distance: ${distance.toStringAsFixed(2)} meters'),
-                );
+                // Check if lat and long lists are not empty
+                if (stopLatList != null &&
+                    stopLatList.isNotEmpty &&
+                    stopLonList != null &&
+                    stopLonList.isNotEmpty) {
+                  final stopLat = stopLatList.first;
+                  final stopLon = stopLonList.first;
+                  final distance = calculateDistance(stopLat, stopLon);
+
+                  // Print the stop details
+                  print(
+                      'Stop: $stopName, Latitude: $stopLat, Longitude: $stopLon, Distance: $distance');
+
+                  return ListTile(
+                    title: Text(stopName),
+                    subtitle:
+                        Text('Distance: ${distance.toStringAsFixed(2)} meters'),
+                  );
+                } else {}
               },
             ),
           ),
