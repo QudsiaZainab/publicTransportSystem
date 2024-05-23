@@ -6,6 +6,7 @@
 
     <application
         android:label="my_app"
+        android:usesCleartextTraffic="false"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
